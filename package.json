@@ -16,6 +16,7 @@
     "@use-gesture/react": "^10.3.1",
     "react": "^19.3.1",
     "react-dom": "^19.3.1",
+    "react-dropzone": "^20.1.4",
     "tailwindcss": "^4.3.3",
     "three": "^0.187.0"
   },
