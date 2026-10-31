@@ -1,0 +1,31 @@
+@import "tailwindcss";
+
+/* Project tokens for the "Nothing Like This" dark experience (Tailwind 4 CSS-first). */
+@theme {
+  /* Pure black canvas — the experience is set on black per the brief. */
+  --color-canvas: #000000;
+  /* Light rim / edge-highlight colour (glass-like lens highlights). */
+  --color-rim: #e8e8e8;
+  /* Muted text on the black canvas. */
+  --color-muted: #9ca3af;
+  /* Subtle accent for interactive affordances. */
+  --color-accent: #c084fc;
+}
+
+html {
+  color-scheme: dark;
+}
+
+html,
+body,
+#root {
+  min-height: 100svh;
+}
+
+body {
+  margin: 0;
+  background-color: var(--color-canvas);
+  color: var(--color-muted);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
