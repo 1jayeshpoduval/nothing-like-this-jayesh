@@ -14,10 +14,12 @@ export function UploadedImage({ asset, onChangeImage }) {
         alt="Uploaded image"
         className="h-full w-full object-cover"
       />
+      {/* z-30 keeps the button clickable above LensStage's lens handle (z-10)
+          when the lens covers the image, e.g. after alignment. */}
       <button
         type="button"
         onClick={onChangeImage}
-        className="absolute top-3 right-3 cursor-pointer border border-rim/30 bg-canvas/80 px-4 py-2 text-sm text-rim transition-colors hover:border-accent hover:text-accent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+        className="absolute top-3 right-3 z-30 cursor-pointer border border-rim/30 bg-canvas/80 px-4 py-2 text-sm text-rim transition-colors hover:border-accent hover:text-accent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
       >
         Change image
       </button>

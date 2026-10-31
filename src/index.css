@@ -10,6 +10,45 @@
   --color-muted: #9ca3af;
   /* Subtle accent for interactive affordances. */
   --color-accent: #c084fc;
+  /* Shared easing token for stage transitions (implementation-plan 7.3). */
+  --ease-stage: cubic-bezier(0.22, 1, 0.36, 1);
+  /* Lens glow light-up on show: no glow -> resting glow over ~2.2 s
+     (LensStage plate). `from` is fully transparent; `to` is the exact resting
+     shadow from LensStage's plate class, so the handoff at the end is seamless.
+     ease-in-out keeps the ramp visible through its middle, not front-loaded. */
+  --animate-lens-glow-in: lens-glow-in 2200ms ease-in-out backwards;
+  /* Hint fade-in beside the lens: slow fade after a short delay. */
+  --animate-hint-fade-in: hint-fade-in 1400ms ease-out 300ms backwards;
+  /* Hint fade-out on the first lens pointerdown; LensHint unmounts on end. */
+  --animate-hint-fade-out: hint-fade-out 400ms ease-in forwards;
+  @keyframes lens-glow-in {
+    from {
+      box-shadow:
+        inset 0 0 0 1px rgba(232, 232, 232, 0),
+        0 0 28px -8px rgba(232, 232, 232, 0);
+    }
+    to {
+      box-shadow:
+        inset 0 0 0 1px rgba(232, 232, 232, 0.12),
+        0 0 28px -8px rgba(232, 232, 232, 0.3);
+    }
+  }
+  @keyframes hint-fade-in {
+    from {
+      opacity: 0;
+    }
+    to {
+      opacity: 1;
+    }
+  }
+  @keyframes hint-fade-out {
+    from {
+      opacity: 1;
+    }
+    to {
+      opacity: 0;
+    }
+  }
 }
 
 html {
