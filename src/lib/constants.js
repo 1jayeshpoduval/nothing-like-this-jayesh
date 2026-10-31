@@ -12,13 +12,23 @@ export const IMAGE_HEIGHT = 400;
 export const LENS_WIDTH = 600;
 export const LENS_HEIGHT = 400;
 
-// Lens rest position: left offset 240 px, top offset 0 (overhangs the image's right edge).
-export const LENS_REST_X = 240;
+// Visible sliver of the resting lens, in CSS px, measured from the viewport's
+// right edge. At rest the lens's left edge sits LENS_SLIVER_PX inside the right
+// edge at every viewport width, so only this much of the lens shows. The rest
+// x is viewport-dependent and computed by computeLensRestX (lib/stageGeometry.js).
+export const LENS_SLIVER_PX = 32;
+
+// Breathing room kept around the scaled image anchor (plan 1.4). Used by
+// computeStageScale: scale = min(1, (viewportWidth - margin) / IMAGE_WIDTH).
+export const STAGE_VIEWPORT_MARGIN_PX = 32;
+
+// Lens rest y: top offset 0. The rest x is responsive (see LENS_SLIVER_PX).
 export const LENS_REST_Y = 0;
 
-// Lens drag bounds in stage pixels (x: 0..240, y: -80..80).
+// Lens drag bounds in stage pixels: x runs from 0 (image's left edge) to the
+// responsive rest x; y is -80..80. The lens never travels past its rest
+// position (section 1.4 / 4.5).
 export const LENS_MIN_X = 0;
-export const LENS_MAX_X = 240;
 export const LENS_MIN_Y = -80;
 export const LENS_MAX_Y = 80;
 
@@ -29,13 +39,17 @@ export const LENS_TRIGGER_Y = 48;
 // Alignment must hold this long before onAligned fires; moving out cancels (section 4.5).
 export const LENS_SETTLE_MS = 120;
 
+// Arrow-key nudge of the accessible lens handle, in stage pixels (section 4.5).
+export const LENS_KEYBOARD_STEP_PX = 10;
+
 // 3D plane in world units (PlaneGeometry 6 x 4) and the stage-pixel scale.
 export const PLANE_WIDTH = 6;
 export const PLANE_HEIGHT = 4;
 export const WORLD_TO_PIXEL = 100; // 1 world unit = 100 CSS px
 
-// Stage composition frame: 600 px image + 240 px lens overhang (section 1.4).
-export const COMPOSITION_WIDTH = 840;
+// Stage composition height. Width is not fixed: the lens rests responsively
+// beyond the image's right edge (see LENS_SLIVER_PX). The lens may overhang
+// vertically within LENS_MIN_Y..LENS_MAX_Y by design; the box stays 400 px tall.
 export const COMPOSITION_HEIGHT = 400;
 
 // --- Camera (sections 1.4 / 5.3) ---
