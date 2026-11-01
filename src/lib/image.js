@@ -16,6 +16,20 @@ export const ALLOWED_IMAGE_MIME_TYPES = Object.freeze([
   IMAGE_MIME_WEBP,
 ]);
 
+// MIME -> extension map shared by every picker and dropzone. react-dropzone
+// consumes the map as-is; the native <input type="file"> consumes the flat
+// `accept` string below. Single source so both paths accept the same files.
+export const ACCEPTED_IMAGE_TYPES = Object.freeze({
+  [IMAGE_MIME_JPEG]: [".jpg", ".jpeg"],
+  [IMAGE_MIME_PNG]: [".png"],
+  [IMAGE_MIME_WEBP]: [".webp"],
+});
+
+// Flat `accept` attribute value for a native file input.
+export const IMAGE_FILE_INPUT_ACCEPT = Object.values(ACCEPTED_IMAGE_TYPES)
+  .flat()
+  .join(",");
+
 // Hard upload cap: 10 MB. Larger files are rejected before any decode work.
 export const MAX_IMAGE_FILE_SIZE = 10 * 1024 * 1024;
 

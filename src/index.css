@@ -1,5 +1,29 @@
 @import "tailwindcss";
 
+/* Display font scaffold. To enable: drop the file into src/assets/fonts/
+   (e.g. Display-Regular.woff2 or Display-SemiBold.woff2), uncomment the
+   block below, and make sure the family name matches --font-display above.
+   Vite resolves the relative url() at build time, so a missing file fails
+   the build; keep this commented until the file exists. */
+
+@font-face {
+  font-family: "Display";
+  src: url("./assets/fonts/OpenSauceOne-Medium.woff2") format("woff2");
+  font-weight: 600;
+  font-style: normal;
+  font-display: swap;
+}
+
+/* Body font (subtitle and cues). LTSuperior Medium is a single OTF, so it is
+   declared at weight 500. Vite resolves the relative url() at build time. */
+@font-face {
+  font-family: "LTSuperior";
+  src: url("./assets/fonts/LTSuperior-Medium.otf") format("opentype");
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+}
+
 /* Project tokens for the "Nothing Like This" dark experience (Tailwind 4 CSS-first). */
 @theme {
   /* Pure black canvas — the experience is set on black per the brief. */
@@ -10,27 +34,112 @@
   --color-muted: #9ca3af;
   /* Subtle accent for interactive affordances. */
   --color-accent: #c084fc;
+  /* Yellow used by the top shader (TOP_SHADER_AURORA colorB) and the snap
+     trail. Hover/focus highlight for text affordances such as "Change image". */
+  --color-shader-yellow: #ffd60a;
+  /* Display font for the page heading/subtitle (font-display utility).
+     Falls back to the system sans stack until a font is wired via @font-face
+     below. Replace the first entry with the family name once it is added. */
+  --font-display: "Display", ui-sans-serif, system-ui, sans-serif;
+  /* Body font for the subtitle and small cue/hint text (font-body utility).
+     LTSuperior Medium, declared via @font-face above. */
+  --font-body: "LTSuperior", ui-sans-serif, system-ui, sans-serif;
   /* Shared easing token for stage transitions (implementation-plan 7.3). */
   --ease-stage: cubic-bezier(0.22, 1, 0.36, 1);
-  /* Lens glow light-up on show: no glow -> resting glow over ~2.2 s
-     (LensStage plate). `from` is fully transparent; `to` is the exact resting
-     shadow from LensStage's plate class, so the handoff at the end is seamless.
-     ease-in-out keeps the ramp visible through its middle, not front-loaded. */
-  --animate-lens-glow-in: lens-glow-in 2200ms ease-in-out backwards;
+  /* Shared timing for the lens light-up: the rim glow (LensStage plate) and
+     the ridge crossfade (FlutedLenticularLens) both use these, so the whole
+     lens ramps together. ease-in-out keeps the ramp visible through its middle,
+     and makes the two ridge layers' opacity curves exact complements. */
+  --lens-glow-duration: 2200ms;
+  --lens-glow-easing: ease-in-out;
+  /* Lens light-up on show (LensStage plate): starts at the DISABLED look and
+     ramps to the enabled resting look over the shared duration. `from` mirrors
+     LensStage's disabled plate (opacity-30, border-rim/10, disabled ring
+     shadow), so the first frame matches the disabled lens; `to` is the exact
+     enabled resting plate (border-rim/55 + rest shadow), so the handoff at the
+     end is seamless. Opacity is what makes the whole lens - and therefore the
+     rest ridges - brighten; the ridge crossfade runs alongside it. */
+  --animate-lens-glow-in: lens-glow-in var(--lens-glow-duration)
+    var(--lens-glow-easing) backwards;
+  /* Ridge crossfade on show: rest ridges fade out while the active ridges fade
+     in, over the same duration and easing as the rim glow. */
+  --animate-lens-ridge-in: lens-ridge-in var(--lens-glow-duration)
+    var(--lens-glow-easing) backwards;
+  --animate-lens-ridge-out: lens-ridge-out var(--lens-glow-duration)
+    var(--lens-glow-easing) forwards;
   /* Hint fade-in beside the lens: slow fade after a short delay. */
   --animate-hint-fade-in: hint-fade-in 1400ms ease-out 300ms backwards;
   /* Hint fade-out on the first lens pointerdown; LensHint unmounts on end. */
   --animate-hint-fade-out: hint-fade-out 400ms ease-in forwards;
-  @keyframes lens-glow-in {
+  /* Drag-cue nudge on the resting lens: a small leftward move (8 px) and back,
+     then a pause, looping until the first interaction (LensStage). Animates the
+     individual `translate` property, so it composes with the handle's inline
+     `transform` (position) and causes no layout. Starts with the hint fade-in
+     delay so the nudge and the "Drag the lens" text appear together. */
+  --animate-lens-nudge: lens-nudge 2600ms ease-in-out 300ms infinite;
+  /* Page heading wipe (PageHeading). Left-to-right: the outgoing line is wiped
+     away from the left edge, and the incoming line is revealed from the left
+     edge. Both start together with no delay, on the same event as the lenticular
+     crossfade (LenticularStage / CANVAS_FADE_MS). The clip-path keyframes use
+     the same geometry as PageHeading's CLIP_* constants, kept in sync. */
+  --animate-heading-wipe-out: heading-wipe-out 900ms ease-out forwards;
+  --animate-heading-wipe-in: heading-wipe-in 1100ms ease-out backwards;
+  @keyframes heading-wipe-out {
     from {
-      box-shadow:
-        inset 0 0 0 1px rgba(232, 232, 232, 0),
-        0 0 28px -8px rgba(232, 232, 232, 0);
+      clip-path: inset(-0.5em -0.2em);
+      opacity: 1;
     }
     to {
+      clip-path: inset(-0.5em -0.2em -0.4em 100%);
+      opacity: 0;
+    }
+  }
+  @keyframes heading-wipe-in {
+    from {
+      clip-path: inset(-0.4em 100% -0.4em -0.2em);
+      opacity: 0;
+    }
+    to {
+      clip-path: inset(-0.4em -0.2em);
+      opacity: 1;
+    }
+  }
+  @keyframes lens-glow-in {
+    /* Disabled look (kept in sync with LensStage's disabled plate class):
+       opacity-30, border-rim/10, ring-only shadow with no blur glow. */
+    from {
+      opacity: 0.3;
+      border-color: rgba(232, 232, 232, 0.1);
       box-shadow:
-        inset 0 0 0 1px rgba(232, 232, 232, 0.12),
-        0 0 28px -8px rgba(232, 232, 232, 0.3);
+        inset 0 0 0 1px rgba(232, 232, 232, 0.2),
+        0 0 0 1px rgba(232, 232, 232, 0.3),
+        0 0 36px -6px rgba(232, 232, 232, 0);
+    }
+    /* Enabled resting look; must match LensStage's enabled rest classes
+       (border-rim/55 and rest shadow), kept in sync. */
+    to {
+      opacity: 1;
+      border-color: rgba(232, 232, 232, 0.55);
+      box-shadow:
+        inset 0 0 0 1px rgba(232, 232, 232, 0.2),
+        0 0 0 1px rgba(232, 232, 232, 0.35),
+        0 0 36px -6px rgba(232, 232, 232, 0.35);
+    }
+  }
+  @keyframes lens-ridge-in {
+    from {
+      opacity: 0;
+    }
+    to {
+      opacity: 1;
+    }
+  }
+  @keyframes lens-ridge-out {
+    from {
+      opacity: 1;
+    }
+    to {
+      opacity: 0;
     }
   }
   @keyframes hint-fade-in {
@@ -48,6 +157,53 @@
     to {
       opacity: 0;
     }
+  }
+  @keyframes lens-nudge {
+    /* Hold at rest, move 8 px left, return, then rest until the loop restarts.
+       Percentages of the 2600 ms cycle: ~260 ms rest, ~260 ms out, ~310 ms back,
+       ~1.8 s pause. */
+    0%,
+    10% {
+      translate: 0 0;
+    }
+    20% {
+      translate: -8px 0;
+    }
+    32%,
+    100% {
+      translate: 0 0;
+    }
+  }
+}
+
+/* Snap trail (components/experience/SnapTrail). The sweep moves the dash head
+   from 0 to one full perimeter; --trail-start and --trail-perimeter are set
+   inline. The fade is applied to the overlay wrapper after the lap. */
+@keyframes snap-trail-sweep {
+  from {
+    stroke-dashoffset: var(--trail-start);
+  }
+  to {
+    stroke-dashoffset: calc(var(--trail-start) - var(--trail-perimeter));
+  }
+}
+@keyframes snap-trail-fade {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}
+
+/* Uploaded image fade-in (components/experience/CrossfadeImage). Duration and
+   easing are set inline from IMAGE_FADE_MS and --ease-stage. */
+@keyframes image-fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
   }
 }
 

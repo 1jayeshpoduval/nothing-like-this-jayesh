@@ -14,7 +14,7 @@
 
 // Ridges across the lens width (pitch = width / fluteCount; ~12 px on the
 // 600 px stage lens). Raise for finer flutes, lower for broader ones.
-export const FLUTE_COUNT = 90;
+export const FLUTE_COUNT = 210;
 
 // feDisplacementMap `scale`: total horizontal sway in CSS px across one
 // ridge (displacement / 2 to each side). Kept light on purpose - the look
@@ -93,21 +93,47 @@ export const buildFluteDisplacementMap = ({ fluteCount }) => {
   return `data:image/svg+xml,${encodeURIComponent(svg)}`;
 };
 
+// Ridge highlight alphas (0..1). Raise for more visible flutes on a dim
+// screen; lower if the ridges look harsh on bright backdrops.
+// Crest: the bright edge of each ridge (rim color, #e8e8e8).
+export const RIDGE_CREST_ALPHA = 0.3;
+// Soft shoulder: the falloff just past the crest.
+export const RIDGE_SHOULDER_ALPHA = 0.5;
+// Trough: the dark side of each ridge (black). Gives depth on photos.
+export const RIDGE_TROUGH_ALPHA = 0.32;
+
+// Active (image uploaded) ridge alphas. Lower crest/shoulder than the rest
+// values above so the enabled lens is softer, not blown out, while staying
+// visible on the edge. Trough is shared (it only darkens, never brightens).
+export const RIDGE_ACTIVE_CREST_ALPHA = 0.18;
+export const RIDGE_ACTIVE_SHOULDER_ALPHA = 0.28;
+
 // CSS ridge highlights for the overlay that sits above the filtered layer
 // (deliberately outside the filter, so the ridges and rim are never
-// distorted). One ridge per period: a soft rim-colored crest (#e8e8e8, the
-// --color-rim token) then a faint trough shadow. Stop positions are
-// fractions of one flute period (100 / fluteCount % of the lens width);
-// repeating-linear-gradient tiles them across the lens.
-export const buildFluteHighlightGradient = ({ fluteCount }) => {
+// distorted). One ridge per period: a rim-colored crest (#e8e8e8, the
+// --color-rim token) then a trough shadow. Alphas come from the RIDGE_*
+// constants above, so the ridges stay readable on a dim screen and on the
+// pure black canvas, where the backdrop refraction contributes nothing. Stop
+// positions are fractions of one flute period (100 / fluteCount % of the lens
+// width); repeating-linear-gradient tiles them across the lens. The 0
+// endpoints are kept at 0 so adjacent periods join seamlessly. `isActive`
+// selects the dimmer active crest/shoulder alphas (default: rest values).
+export const buildFluteHighlightGradient = ({
+  fluteCount,
+  isActive = false,
+}) => {
   const periodPct = 100 / fluteCount;
   const at = (fraction) => `${(periodPct * fraction).toFixed(4)}%`;
+  const crestAlpha = isActive ? RIDGE_ACTIVE_CREST_ALPHA : RIDGE_CREST_ALPHA;
+  const shoulderAlpha = isActive
+    ? RIDGE_ACTIVE_SHOULDER_ALPHA
+    : RIDGE_SHOULDER_ALPHA;
   return [
     "repeating-linear-gradient(90deg,",
     `rgba(232, 232, 232, 0) ${at(0)},`,
-    `rgba(232, 232, 232, 0.12) ${at(0.2)},`,
-    `rgba(232, 232, 232, 0.03) ${at(0.45)},`,
-    `rgba(0, 0, 0, 0.16) ${at(0.7)},`,
+    `rgba(232, 232, 232, ${crestAlpha}) ${at(0.2)},`,
+    `rgba(232, 232, 232, ${shoulderAlpha}) ${at(0.45)},`,
+    `rgba(0, 0, 0, ${RIDGE_TROUGH_ALPHA}) ${at(0.7)},`,
     `rgba(232, 232, 232, 0) ${at(1)})`,
   ].join(" ");
 };
