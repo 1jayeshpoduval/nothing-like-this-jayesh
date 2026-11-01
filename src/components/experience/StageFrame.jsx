@@ -51,7 +51,8 @@ export function StageFrame({ children }) {
 
   return (
     <StageGeometryContext.Provider value={geometry}>
-      <div className="flex h-full w-full items-center justify-center">
+      {/* Height is auto: App's flex column sizes this from the scaled sizer below. */}
+      <div className="flex w-full items-center justify-center">
         {/* Sizer box matches the scaled IMAGE anchor, so flex centering keeps
             the image at the viewport center while the lens overflows beside
             it. */}

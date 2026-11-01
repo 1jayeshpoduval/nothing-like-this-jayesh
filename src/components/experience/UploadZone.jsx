@@ -9,17 +9,17 @@
 import { useCallback } from "react";
 import { useDropzone } from "react-dropzone";
 
-// MIME -> extension map for both the dropzone checks and the native picker.
-const ACCEPTED_IMAGE_TYPES = {
-  "image/jpeg": [".jpg", ".jpeg"],
-  "image/png": [".png"],
-  "image/webp": [".webp"],
-};
+import { ACCEPTED_IMAGE_TYPES } from "../../lib/image.js";
 
 // The `error` prop may be the hook's { code, message } record or a plain
 // display string; render whichever the caller passed.
 const errorTextOf = (error) =>
   (typeof error === "string" ? error : error?.message) ?? "";
+
+// Dash pattern for the SVG border, in px: [dash length, gap length]. The native
+// `border-dashed` gap is fixed by the browser, so the border is drawn with an
+// SVG stroke to control the gap (wider than the native default).
+const DASH_PATTERN = "6 7";
 
 export function UploadZone({ onFileSelected, error, isProcessing = false }) {
   // Accept everything the dropzone hands over and let the hook validate: an
@@ -30,7 +30,7 @@ export function UploadZone({ onFileSelected, error, isProcessing = false }) {
       const file = acceptedFiles[0] ?? fileRejections[0]?.file;
       if (file) onFileSelected(file);
     },
-    [onFileSelected]
+    [onFileSelected],
   );
 
   // The root stays a pure drop surface: `noClick`/`noKeyboard` hand click and
@@ -52,36 +52,70 @@ export function UploadZone({ onFileSelected, error, isProcessing = false }) {
       {...getRootProps()}
       aria-busy={isProcessing}
       className={[
-        "flex h-[400px] w-[600px] flex-col border border-dashed transition-transform duration-200",
+        "group relative flex h-100 w-150 flex-col transition-colors duration-100",
+        // The stroke colour is driven by `currentColor`, so these text colours
+        // drive the dashed border and the copy (idle / hover / keyboard focus / drag).
+        // `has-focus-visible` lights up the zone when the inner button is keyboard-focused.
         isDragActive
-          ? "scale-[1.01] border-accent"
-          : "border-muted/50 hover:border-accent/60",
+          ? "scale-[1.01] text-shader-yellow"
+          : "text-muted/60 hover:text-shader-yellow has-focus-visible:text-shader-yellow",
         isProcessing ? "opacity-50" : "",
       ].join(" ")}
     >
+      {/* Decorative dashed border. pointer-events-none keeps drag/click on the root. */}
+      <svg
+        aria-hidden="true"
+        className="pointer-events-none absolute inset-0 h-full w-full overflow-visible"
+      >
+        <rect
+          x="1"
+          y="1"
+          style={{ width: "calc(100% - 2px)", height: "calc(100% - 2px)" }}
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeDasharray={DASH_PATTERN}
+        />
+      </svg>
+
       <input {...getInputProps()} />
 
       <button
         type="button"
         onClick={open}
         disabled={isProcessing}
-        className="flex flex-1 cursor-pointer flex-col items-center justify-center gap-2 text-center focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+        className="flex flex-1 cursor-pointer flex-col items-center justify-center gap-4 text-center  "
       >
-        <span className="text-lg text-rim">
+        {/* 12px gap above the copy comes from the button's gap-3. Decorative only. */}
+        {/* Dimmed at rest; lights up on zone hover, drag, or keyboard focus (group = root). */}
+        <img
+          src="/images/dropzone-img.jpg"
+          alt=""
+          aria-hidden="true"
+          draggable={false}
+          className={[
+            "pointer-events-none h-12 rounded-md w-12 select-none transition-[opacity,filter] duration-100",
+            isDragActive
+              ? "opacity-100 brightness-100"
+              : "opacity-50 brightness-80 group-hover:opacity-100 group-hover:brightness-100 group-has-focus-visible:opacity-100 group-has-focus-visible:brightness-100",
+          ].join(" ")}
+        />
+        {/* Inherits the root's text colour so it fades grey -> white with the zone. */}
+        <span className="text-sm font-body transition-colors duration-100">
           {isDragActive
             ? "Drop to use this image"
             : isProcessing
               ? "Preparing image\u2026"
-              : "Drop an image"}
+              : "Drop an image here or click to browse"}
         </span>
-        <span className="text-sm text-muted">or click to browse</span>
+        {/*  <span className="font-body text-sm text-muted">or click to browse</span> */}
       </button>
 
       {/* Inline error below the copy, announced politely. */}
       <p
         role="status"
         aria-live="polite"
-        className="min-h-5 px-4 pb-4 text-sm text-accent"
+        className="font-body min-h-5 px-4 pb-4 text-sm text-accent"
       >
         {errorText}
       </p>

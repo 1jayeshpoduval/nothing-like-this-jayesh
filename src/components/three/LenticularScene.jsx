@@ -1,4 +1,4 @@
-// Lenticular spike scene for Session 2A.
+// Lenticular scene.
 //
 // Canvas, camera, renderer, and scene content copied from:
 //   https://github.com/wass08/r3f-lenticular-material
@@ -6,18 +6,24 @@
 // MIT License — Copyright (c) 2025 Wassim SAMAD
 //
 // Differences from the reference: the leva control panel is removed (no
-// sliders), so the reference defaults are fixed here (texture set
-// "evil-angel"; nbDivisions/height are pinned in LenticularPlane.jsx).
-// Mouse rotation stays available through OrbitControls.
+// sliders), so the reference defaults are fixed here (nbDivisions/height are
+// pinned in LenticularPlane.jsx). Textures come from the uploaded `asset`
+// (side A) and its opposite image (side B). Mouse rotation stays available
+// through OrbitControls.
 
 import { Canvas, extend } from "@react-three/fiber";
-import {
-  Environment,
-  OrbitControls,
-  useTexture,
-  useVideoTexture,
-} from "@react-three/drei";
+import { Environment, OrbitControls, useTexture } from "@react-three/drei";
+import { useEffect, useMemo } from "react";
 import * as THREE from "three/webgpu";
+import { OPPOSITE_IMAGE_URL } from "../../lib/opposites";
+import {
+  CAMERA_FAR,
+  CAMERA_FOV,
+  CAMERA_NEAR,
+  CAMERA_POSITION,
+  CAMERA_ZOOM,
+  DPR_MAX,
+} from "../../lib/constants";
 import { LenticularPlane } from "./LenticularPlane";
 
 // The Canvas seeds its element catalogue from the plain three namespace,
@@ -25,47 +31,71 @@ import { LenticularPlane } from "./LenticularPlane";
 // node-material elements (e.g. <meshStandardNodeMaterial>) resolve.
 extend(THREE);
 
-// Reference leva `textureSet` control default — see header comment.
-const TEXTURE_SET = "evil-angel";
+// `asset` is the upload result from useImageUpload: `canvas` is the
+// normalized 600x400 source for side A, `oppositeUrl` the image for side B.
+const SceneContent = ({ asset }) => {
+  // Side B: the fixed opposite image. Falls back to the shared constant when
+  // no asset is present so the hook always receives a valid URL.
+  const loadedB = useTexture(asset?.oppositeUrl ?? OPPOSITE_IMAGE_URL);
 
-const SceneContent = () => {
-  const videoA = useVideoTexture("spike/textures/mathematics-twerk/twerk-course.mp4");
-  const videoB = useVideoTexture(
-    "spike/textures/mathematics-twerk/mathematics-numbers.mp4"
-  );
+  // useTexture does not set a colour space, so side B gets sRGB to match side
+  // A. The hook's value is never mutated: a clone shares the decoded image
+  // source and is owned here, so it is disposed on replace/unmount.
+  const textureB = useMemo(() => {
+    const texture = loadedB.clone();
+    texture.colorSpace = THREE.SRGBColorSpace;
+    texture.needsUpdate = true;
+    return texture;
+  }, [loadedB]);
 
-  const textureEvilAngelA = useTexture("spike/textures/evil-angel/evil.png");
-  const textureEvilAngelB = useTexture("spike/textures/evil-angel/angel.png");
+  useEffect(() => {
+    return () => textureB.dispose();
+  }, [textureB]);
 
-  const textureSummerWinterA = useTexture("spike/textures/summer-winter/summer.png");
-  const textureSummerWinterB = useTexture("spike/textures/summer-winter/winter.png");
+  // Side A: wrap the normalized upload canvas. Recreated only when the canvas
+  // changes (i.e. a new upload), never on unrelated re-renders.
+  const canvas = asset?.canvas;
+  const textureA = useMemo(() => {
+    if (!canvas) return null;
+    const texture = new THREE.CanvasTexture(canvas);
+    texture.colorSpace = THREE.SRGBColorSpace;
+    texture.needsUpdate = true;
+    return texture;
+  }, [canvas]);
 
-  const textureA = {
-    ["evil-angel"]: textureEvilAngelA,
-    ["summer-winter"]: textureSummerWinterA,
-    ["mathematics-twerk"]: videoA,
-  }[TEXTURE_SET];
-
-  const textureB = {
-    ["evil-angel"]: textureEvilAngelB,
-    ["summer-winter"]: textureSummerWinterB,
-    ["mathematics-twerk"]: videoB,
-  }[TEXTURE_SET];
+  // Free the GPU resource of the previous canvas texture on replace/unmount.
+  useEffect(() => {
+    return () => textureA?.dispose();
+  }, [textureA]);
 
   return (
     <>
-      <OrbitControls />
+      {/* Zoom and pan off so the card cannot leave the slot. Azimuth/polar
+          clamps arrive in Session 5C. */}
+      <OrbitControls makeDefault enableZoom={false} enablePan={false} />
       <Environment preset="sunset" />
-      <LenticularPlane textureA={textureA} textureB={textureB} />
+      {textureA && <LenticularPlane textureA={textureA} textureB={textureB} />}
     </>
   );
 };
 
-export const LenticularScene = () => {
+// `onCreated` is forwarded to the R3F Canvas; LenticularStage uses it to start
+// the crossfade once the renderer exists. Mouse rotation is plain OrbitControls.
+export const LenticularScene = ({ asset, onCreated }) => {
   return (
     <Canvas
       shadows
-      camera={{ position: [3, 3, 3], fov: 30 }}
+      onCreated={onCreated}
+      // Fixed framing (plan 5.3, see CAMERA_POSITION / CAMERA_ZOOM in constants.js).
+      // Zoom maps the card to 600x400 inside the larger 800x600 canvas.
+      camera={{
+        position: CAMERA_POSITION,
+        fov: CAMERA_FOV,
+        near: CAMERA_NEAR,
+        far: CAMERA_FAR,
+        zoom: CAMERA_ZOOM,
+      }}
+      dpr={[1, DPR_MAX]}
       // WebGPURenderer must be built by an async factory: fiber hands the
       // factory its renderer props (including the Canvas's own canvas) and
       // renders the children only after the returned promise resolves, so
@@ -73,17 +103,17 @@ export const LenticularScene = () => {
       gl={async (props) => {
         const renderer = new THREE.WebGPURenderer({
           ...props,
-          // Reference renderer config kept from the spike (fiber's defaults
-          // already cover antialias/powerPreference).
-          alpha: false,
+          // Transparent clear (alpha 0) so the page's black shows through and
+          // the card hands off seamlessly from the flat image.
+          alpha: true,
           stencil: false,
         });
         await renderer.init();
         return renderer;
       }}
     >
-      <color attach="background" args={["#333"]} />
-      <SceneContent />
+      {/* No <color attach="background"> — the canvas stays transparent. */}
+      <SceneContent asset={asset} />
     </Canvas>
   );
 };

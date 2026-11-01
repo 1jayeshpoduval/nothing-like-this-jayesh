@@ -23,10 +23,15 @@
 // keyboard control at once. The handle's ARIA attributes (tabIndex, role,
 // aria-valuenow) are rendered by LensStage.
 //
-// Alignment (plan 4.5): x <= LENS_TRIGGER_X and abs(y) <= LENS_TRIGGER_Y must
-// hold continuously for LENS_SETTLE_MS before `onAligned` fires exactly once;
-// leaving the zone cancels the pending timer. Once aligned, drag and keyboard
-// input are ignored and the lens holds position (no spring-back).
+// Alignment and magnetic snap (plan 4.5): x <= LENS_TRIGGER_X and
+// abs(y) <= LENS_TRIGGER_Y must hold continuously for LENS_SETTLE_MS. Leaving
+// the zone cancels the pending timer. Once the hold completes, the lens snaps
+// to full cover (progress 1 = x 0, y 0 in image-local coords) over `snapMs`
+// with a CSS ease-out transition (LensStage applies it while `isSnapping`).
+// Drag and keyboard input are ignored from snap start. When the snap ends,
+// `onAligned` fires exactly once and the lens holds position (no spring-back).
+// The snap is shared by pointer and keyboard input, since both move the same
+// travel state.
 
 import { useEffect, useRef, useState } from "react";
 import { useDrag } from "@use-gesture/react";
@@ -37,6 +42,7 @@ import {
   LENS_MIN_X,
   LENS_MIN_Y,
   LENS_SETTLE_MS,
+  LENS_SNAP_MS,
   LENS_TRIGGER_X,
   LENS_TRIGGER_Y,
   LENS_WIDTH,
@@ -59,6 +65,10 @@ const KEYBOARD_DELTAS = {
 // Rest travel: progress 0 (x = restX), y = 0.
 const REST_TRAVEL = { progress: 0, y: 0 };
 
+// Full-cover travel: progress 1 (x = 0, the image's left edge), y = 0. The
+// snap target, so the lens sits exactly over the 600x400 anchor.
+const SNAP_TRAVEL = { progress: 1, y: 0 };
+
 const clamp = (value, min, max) => Math.min(max, Math.max(min, value));
 
 const isInTriggerZone = ({ x, y }) =>
@@ -78,10 +88,18 @@ const resolveDragScale = (providedScale, element) => {
   return width > 0 ? width / LENS_WIDTH : 1;
 };
 
-export function useLensDrag({ onAligned, scale, restX }) {
+export function useLensDrag({
+  onAligned,
+  scale,
+  restX,
+  snapMs = LENS_SNAP_MS,
+}) {
   const [travel, setTravel] = useState(REST_TRAVEL);
   const [isDragging, setIsDragging] = useState(false);
-  // Latched once onAligned fires; from then on drag/keyboard input is ignored.
+  // True from snap start until the lens is handed off. Gates drag and keyboard
+  // input (the ref is read by event handlers, the state drives the effects).
+  const [isSnapping, setIsSnapping] = useState(false);
+  // Latched once onAligned fires.
   const [hasAligned, setHasAligned] = useState(false);
 
   // Derived each render, so the lens follows restX when the viewport resizes.
@@ -91,7 +109,7 @@ export function useLensDrag({ onAligned, scale, restX }) {
   };
 
   const onAlignedRef = useRef(onAligned);
-  const hasAlignedRef = useRef(false);
+  const isSnappingRef = useRef(false);
   // Position, effective scale and rest x snapshotted when a drag starts.
   const dragOriginRef = useRef({ x: restX, y: 0, scale: 1, restX });
   // use-gesture's cancel() for the in-flight drag, invoked on window blur.
@@ -112,30 +130,46 @@ export function useLensDrag({ onAligned, scale, restX }) {
 
   const isAligned = isInTriggerZone(position);
 
-  // Settle timer (plan 4.5): the trigger zone must hold for LENS_SETTLE_MS
-  // before onAligned fires exactly once. Re-entering restarts the full hold;
-  // the cleanup cancels the pending timer whenever the lens leaves the zone,
-  // unmounts, or StrictMode re-runs the effect.
+  // Snap trigger (plan 4.5): the trigger zone must hold for LENS_SETTLE_MS.
+  // Re-entering restarts the full hold; the cleanup cancels the pending timer
+  // whenever the lens leaves the zone, unmounts, or StrictMode re-runs the
+  // effect. Once the hold completes, the snap starts: the lens moves to full
+  // cover, drag is dropped, and input is ignored from here on.
   useEffect(() => {
-    if (hasAligned || !isAligned) return undefined;
+    if (isSnapping || !isAligned) return undefined;
     const timer = setTimeout(() => {
-      hasAlignedRef.current = true;
-      setHasAligned(true);
-      onAlignedRef.current?.();
+      isSnappingRef.current = true;
+      setIsDragging(false);
+      setIsSnapping(true);
+      setTravel(SNAP_TRAVEL);
     }, LENS_SETTLE_MS);
     return () => clearTimeout(timer);
-  }, [isAligned, hasAligned]);
+  }, [isAligned, isSnapping]);
+
+  // Snap completion: after the CSS ease (snapMs) the lens is at full cover.
+  // Latch aligned and hand off once. isSnapping never returns to false, so this
+  // effect runs once per mount (cleanup on unmount clears the timer).
+  useEffect(() => {
+    if (!isSnapping) return undefined;
+    const timer = setTimeout(() => {
+      setHasAligned(true);
+      onAlignedRef.current?.();
+    }, snapMs);
+    return () => clearTimeout(timer);
+  }, [isSnapping, snapMs]);
 
   const dragHandler = (state) => {
     const { first, last, movement } = state;
 
-    // Release bookkeeping runs before the aligned guard so an in-flight drag
+    // Release bookkeeping runs before the snap guard so an in-flight drag
     // that settles mid-press still ends cleanly.
     if (last) {
       cancelDragRef.current = null;
       setIsDragging(false);
     }
-    if (hasAlignedRef.current) return;
+    // No pointer input once the snap has started (drag is disabled while the
+    // lens eases to full cover and after the handoff).
+    if (isSnappingRef.current) return;
 
     if (first) {
       cancelDragRef.current = state.cancel;
@@ -173,7 +207,7 @@ export function useLensDrag({ onAligned, scale, restX }) {
   };
 
   const handleKeyDown = (event) => {
-    if (hasAlignedRef.current) return;
+    if (isSnappingRef.current) return;
     const delta = KEYBOARD_DELTAS[event.key];
     if (!delta) return;
     // Keep arrow keys from scrolling the page while the handle has focus.
@@ -206,6 +240,7 @@ export function useLensDrag({ onAligned, scale, restX }) {
     isDragging,
     progress: travel.progress,
     isAligned,
+    isSnapping,
     hasAligned,
     bind,
   };

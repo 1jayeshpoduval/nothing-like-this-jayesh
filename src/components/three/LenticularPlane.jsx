@@ -14,14 +14,25 @@ import { extend } from "@react-three/fiber";
 import { useMemo } from "react";
 import { MeshStandardNodeMaterial } from "three/webgpu";
 import { createLenticularNodes } from "../../shaders/lenticular";
+import {
+  LENTICULAR_FREQUENCY,
+  PLANE_HEIGHT,
+  PLANE_WIDTH,
+  RIDGE_HEIGHT,
+} from "../../lib/constants";
 
 extend({
   MeshStandardNodeMaterial,
 });
 
-// Reference control max/default — see header comment.
-const NB_DIVISIONS = 90;
-const LENTICULAR_HEIGHT = 0.05;
+// Columns and ridge height come from constants.js (see notes there).
+const NB_DIVISIONS = LENTICULAR_FREQUENCY;
+const LENTICULAR_HEIGHT = RIDGE_HEIGHT;
+// 2 segments per column, exactly as the reference (nbDivisions * 2). The count
+// must be a multiple of NB_DIVISIONS so every column boundary (the fract() wrap
+// where the ridge jumps) falls on a vertex. A non-multiple such as 240 smears
+// the ridge across two columns.
+const SEGMENTS_X = NB_DIVISIONS * 2;
 
 export const LenticularMaterial = ({
   textureA,
@@ -44,7 +55,8 @@ export const LenticularMaterial = ({
 export const LenticularPlane = ({ textureA, textureB }) => {
   return (
     <mesh>
-      <planeGeometry args={[1, 1, NB_DIVISIONS * 2, 1]} />
+      {/* Fixed 6 x 4 world units (1 unit = 100 px), see constants.js. */}
+      <planeGeometry args={[PLANE_WIDTH, PLANE_HEIGHT, SEGMENTS_X, 1]} />
       <LenticularMaterial
         textureA={textureA}
         textureB={textureB}

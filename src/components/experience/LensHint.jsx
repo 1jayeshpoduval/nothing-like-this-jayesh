@@ -32,14 +32,12 @@ export function LensHint({ restX, isFadingOut, onFadeOutEnd }) {
         role="status"
         aria-live="polite"
         className={[
-          "whitespace-nowrap",
+          "font-body whitespace-nowrap",
           isFadingOut ? "animate-hint-fade-out" : "animate-hint-fade-in",
         ].join(" ")}
         onAnimationEnd={handleAnimationEnd}
       >
-        <span className="text-sm text-rim">
-          Drag lenticular lens over the image
-        </span>
+        <span className="text-sm text-rim">Place lens on the image</span>
       </p>
     </div>
   );

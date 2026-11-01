@@ -39,9 +39,12 @@ const SUPPORTS_BACKDROP_SVG_FILTER =
   (CSS.supports("backdrop-filter", "url(#fluted)") ||
     CSS.supports("-webkit-backdrop-filter", "url(#fluted)"));
 
+// `isActive` dims the ridge highlights for the enabled (image uploaded) state.
+// Defaults to false so existing callers keep the rest look.
 export function FlutedLenticularLens({
   fluteCount = FLUTE_COUNT,
   displacement = FLUTE_DISPLACEMENT,
+  isActive = false,
 }) {
   // useId gives every mounted lens its own filter id; the sanitising keeps
   // the id safe as a CSS url() fragment.
@@ -120,11 +123,33 @@ export function FlutedLenticularLens({
       />
 
       {/* Ridge highlights above the filtered layer, so the rim and ridges
-          stay crisp and the border is never distorted. */}
+          stay crisp and the border is never distorted. The enabled state is a
+          crossfade of two stacked layers: the rest ridges (bottom) fade out
+          while the active ridges (top) fade in, using the same duration and
+          easing as the rim glow (--lens-glow-* in index.css). The keyframes run
+          on mount; LensStage remounts on upload, so this plays once per enable.
+          Reduced motion skips the animation and shows the active look at once. */}
       <div
-        className="absolute inset-0"
-        style={{ backgroundImage: buildFluteHighlightGradient({ fluteCount }) }}
+        className={
+          isActive
+            ? "absolute inset-0 opacity-0 motion-safe:animate-lens-ridge-out"
+            : "absolute inset-0"
+        }
+        style={{
+          backgroundImage: buildFluteHighlightGradient({ fluteCount }),
+        }}
       />
+      {isActive && (
+        <div
+          className="absolute inset-0 motion-safe:animate-lens-ridge-in"
+          style={{
+            backgroundImage: buildFluteHighlightGradient({
+              fluteCount,
+              isActive: true,
+            }),
+          }}
+        />
+      )}
     </div>
   );
 }
